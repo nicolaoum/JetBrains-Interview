@@ -10,18 +10,13 @@ A small Python agent that learns how to test a public API and scores its progres
 - pip
 
 ## Setup
-
-```bash
 pip install -r requirements.txt
-```
 
 Add your `OPENAI_API_KEY` to the `.env` file.
 
 ## How to run
 
-```bash
 python main.py
-```
 
 ## What you will see
 
