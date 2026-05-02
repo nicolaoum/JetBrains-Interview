@@ -1,0 +1,4 @@
+# Python dependencies for the stem API-testing agent.
+openai
+requests
+rich
