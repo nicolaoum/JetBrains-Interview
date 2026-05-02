@@ -12,6 +12,15 @@ from logger import Logger
 class StemAgent:
     """Agent that learns and improves API testing strategies."""
 
+    DEFAULT_ENDPOINTS = (
+        "/posts",
+        "/comments",
+        "/albums",
+        "/photos",
+        "/todos",
+        "/users",
+    )
+
     def __init__(self, base_url: str = "https://jsonplaceholder.typicode.com") -> None:
         load_dotenv()
 
@@ -23,21 +32,66 @@ class StemAgent:
         self.api_key = os.getenv("OPENAI_API_KEY")
         self.client = OpenAI(api_key=self.api_key) if self.api_key else None
 
+        self.suggested_endpoints = []
         self.discovered_endpoints = []
         self.exploration_results = {}
         self.reflection = ""
         self.testing_strategy = {}
         self.execution_results = []
 
-    def explore(self) -> dict:
-        candidate_endpoints = (
-            "/posts",
-            "/comments",
-            "/albums",
-            "/photos",
-            "/todos",
-            "/users",
+    def discover(self) -> list:
+        if self.client is None:
+            raise ValueError("OPENAI_API_KEY is required before discovery can run")
+
+        prompt = (
+            "Suggest 8-10 likely REST API endpoint paths for this base URL. "
+            "Respond with JSON only using one key called endpoints. "
+            "The endpoints value must be a list of path strings like /users or /posts.\n\n"
+            f"Base URL: {self.base_url}"
         )
+
+        self.logger.info("Asking OpenAI to suggest likely API endpoints")
+        response = self.client.chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You suggest likely REST API paths as valid JSON only.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.2,
+            response_format={"type": "json_object"},
+        )
+
+        raw_discovery = response.choices[0].message.content.strip()
+
+        try:
+            discovery = json.loads(raw_discovery)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"OpenAI returned invalid JSON: {raw_discovery}") from error
+
+        endpoints = discovery.get("endpoints", [])
+        if isinstance(endpoints, str):
+            endpoints = [endpoints]
+
+        self.suggested_endpoints = []
+        for endpoint in endpoints:
+            endpoint = str(endpoint).strip()
+            if not endpoint:
+                continue
+            if not endpoint.startswith("/"):
+                endpoint = f"/{endpoint}"
+            self.suggested_endpoints.append(endpoint)
+
+        self.logger.decision(
+            f"OpenAI suggested endpoints: {', '.join(self.suggested_endpoints)}"
+        )
+
+        return self.suggested_endpoints
+
+    def explore(self) -> dict:
+        candidate_endpoints = self.suggested_endpoints or list(self.DEFAULT_ENDPOINTS)
 
         self.logger.info("Starting API exploration")
         self.discovered_endpoints = []
@@ -187,6 +241,8 @@ class StemAgent:
 
         if isinstance(endpoints_to_test, str):
             endpoints_to_test = [endpoints_to_test]
+        if isinstance(test_types, dict):
+            test_types = test_types.keys()
         if isinstance(test_types, str):
             test_types = [test_types]
         if not endpoints_to_test:
@@ -194,9 +250,9 @@ class StemAgent:
 
         supported_test_types = ("auth", "edge_cases", "error_handling", "input_validation")
         test_types_to_run = [
-            test_type.strip().lower().replace(" ", "_").replace("-", "_")
+            str(test_type).strip().lower().replace(" ", "_").replace("-", "_")
             for test_type in test_types
-            if test_type.strip().lower().replace(" ", "_").replace("-", "_")
+            if str(test_type).strip().lower().replace(" ", "_").replace("-", "_")
             in supported_test_types
         ]
         if not test_types_to_run:

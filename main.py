@@ -4,6 +4,7 @@ from agent import StemAgent
 def main() -> None:
     agent = StemAgent()
 
+    agent.discover()
     agent.explore()
     agent.reflect()
     agent.evolve()
