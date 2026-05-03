@@ -1233,3 +1233,419 @@ This approach balances thoroughness with efficiency, targeting the most impactfu
 [2026-05-02 18:55:29] [RESULT] After execution score: 62
 [2026-05-02 18:55:29] [RESULT] Issues found: 4
 [2026-05-02 18:55:29] [RESULT] Score improvement: 62
+[2026-05-03 15:19:19] [INFO] Asking OpenAI to suggest likely API endpoints
+[2026-05-03 15:28:51] [INFO] Asking OpenAI to suggest likely API endpoints
+[2026-05-03 15:28:54] [DECISION] OpenAI suggested endpoints: /posts, /comments, /albums, /photos, /todos, /users, /posts/{postId}/comments, /users/{userId}/posts, /albums/{albumId}/photos, /todos/{todoId}
+[2026-05-03 15:28:54] [INFO] Starting API exploration
+[2026-05-03 15:28:54] [DECISION] Probing /posts
+[2026-05-03 15:28:54] [RESULT] Discovered /posts with status 200
+[2026-05-03 15:28:54] [DECISION] Probing /comments
+[2026-05-03 15:28:55] [RESULT] Discovered /comments with status 200
+[2026-05-03 15:28:55] [DECISION] Probing /albums
+[2026-05-03 15:28:56] [RESULT] Discovered /albums with status 200
+[2026-05-03 15:28:56] [DECISION] Probing /photos
+[2026-05-03 15:28:56] [RESULT] Discovered /photos with status 200
+[2026-05-03 15:28:56] [DECISION] Probing /todos
+[2026-05-03 15:28:56] [RESULT] Discovered /todos with status 200
+[2026-05-03 15:28:56] [DECISION] Probing /users
+[2026-05-03 15:28:56] [RESULT] Discovered /users with status 200
+[2026-05-03 15:28:56] [DECISION] Probing /posts/{postId}/comments
+[2026-05-03 15:28:57] [RESULT] Discovered /posts/{postId}/comments with status 200
+[2026-05-03 15:28:57] [DECISION] Probing /users/{userId}/posts
+[2026-05-03 15:28:57] [RESULT] Discovered /users/{userId}/posts with status 200
+[2026-05-03 15:28:57] [DECISION] Probing /albums/{albumId}/photos
+[2026-05-03 15:28:58] [RESULT] Discovered /albums/{albumId}/photos with status 200
+[2026-05-03 15:28:58] [DECISION] Probing /todos/{todoId}
+[2026-05-03 15:28:58] [INFO] /todos/{todoId} returned status 404
+[2026-05-03 15:28:58] [RESULT] Exploration found 9 endpoints
+[2026-05-03 15:28:58] [INFO] Sending exploration results to OpenAI for reflection
+[2026-05-03 15:29:08] [EVOLUTION] Based on the exploration results of the JSONPlaceholder API endpoints, here is an analysis and prioritized testing strategy focusing on authentication, edge cases, error handling, and input validation:
+
+---
+
+### 1. Authentication (Auth)
+- **Observation:**  
+  The exploration results show no mention of authentication or authorization requirements. JSONPlaceholder is a public fake API for testing and prototyping, so it likely does not enforce auth.
+- **Priority:**  
+  Low for this API. However, if this were a real API, auth testing would be critical.
+- **Recommendation:**  
+  Confirm if any endpoints require auth tokens or credentials. If yes, test:
+  - Access without credentials (expect 401 Unauthorized)
+  - Access with invalid/expired tokens
+  - Access with valid tokens and correct scopes/roles
+
+---
+
+### 2. Edge Cases
+- **Path Parameters with No Data:**  
+  Several endpoints with path parameters (`/posts/{postId}/comments`, `/users/{userId}/posts`, `/albums/{albumId}/photos`) show `item_count: 0`. This suggests either no data exists for those IDs or the parameter is not properly substituted.
+  - Test with valid IDs that have data.
+  - Test with valid IDs that have no related data (expect empty array, 200 OK).
+  - Test with invalid/non-existent IDs (expect 404 or empty response).
+- **Large Data Sets:**  
+  `/photos` returns 5000 items, which is large.
+  - Test pagination or limit parameters if supported.
+  - Test response time and payload size handling.
+- **Empty or Missing Fields:**  
+  Check if any fields can be null or missing in responses.
+- **Boundary Values:**  
+  For numeric IDs, test minimum (e.g., 1), maximum, zero, negative, and non-numeric inputs.
+
+---
+
+### 3. Error Handling
+- **404 Not Found:**  
+  `/todos/{todoId}` returned 404 and was marked undiscovered, indicating the endpoint or resource might not exist.
+  - Test non-existent resource IDs for all endpoints with path parameters.
+  - Confirm consistent 404 responses with meaningful error messages.
+- **Invalid Input:**  
+  Test invalid path parameters (e.g., strings instead of numbers).
+  - Expect 400 Bad Request or 404 Not Found depending on API design.
+- **Unsupported Methods:**  
+  Test HTTP methods not supported on endpoints (e.g., POST on `/users` if only GET is supported).
+  - Expect 405 Method Not Allowed.
+
+---
+
+### 4. Input Validation
+- **Path Parameters:**  
+  Validate type and format (e.g., numeric IDs).
+- **Query Parameters:**  
+  Although not shown in exploration, test if endpoints accept query params (e.g., filtering, sorting).
+  - Test valid and invalid query params.
+- **Payload Validation:**  
+  If POST/PUT endpoints exist (not shown here), test:
+  - Required fields presence
+  - Field types and formats (e.g., email format)
+  - Boundary values (string length, numeric ranges)
+  - Injection attacks (SQL, script)
+
+---
+
+### Concise Testing Strategy
+
+| Test Category       | Focus Areas                                                                 | Priority  | Notes                                      |
+|---------------------|-----------------------------------------------------------------------------|-----------|--------------------------------------------|
+| Authentication      | Confirm if auth is required; test unauthorized access                      | Low       | Likely none for this API                    |
+| Edge Cases          | - Valid IDs with/without data<br>- Invalid/non-existent IDs<br>- Large data sets | High      | Critical for robustness and completeness   |
+| Error Handling      | - 404 for missing resources<br>- 400/404 for invalid inputs<br>- 405 for unsupported methods | High      | Ensures graceful failure and clear feedback|
+| Input Validation    | - Path param types and formats<br>- Query param validation<br>- Payload validation (if applicable) | High      | Prevents malformed requests and security issues |
+
+---
+
+### Summary
+
+- **Focus first on edge cases and error handling** around path parameters and resource existence, since these are common sources of bugs and user confusion.
+- **Validate inputs rigorously** to ensure the API handles unexpected or malformed data gracefully.
+- **Authentication testing is low priority** here but should be revisited if the API changes.
+- **Test large data handling** for endpoints like `/photos` to ensure performance and pagination.
+
+This approach balances coverage with efficiency, targeting the most impactful areas for API reliability and security.
+[2026-05-03 15:29:08] [INFO] Converting reflection into a structured testing strategy
+[2026-05-03 15:29:17] [EVOLUTION] {
+  "endpoints_to_test": [
+    "/posts/{postId}/comments",
+    "/users/{userId}/posts",
+    "/albums/{albumId}/photos",
+    "/photos",
+    "/todos/{todoId}",
+    "/users"
+  ],
+  "test_types": {
+    "authentication": {
+      "description": "Confirm if authentication is required; test unauthorized access scenarios if applicable.",
+      "tests": [
+        "Access without credentials (expect 401 Unauthorized)",
+        "Access with invalid or expired tokens",
+        "Access with valid tokens and correct scopes/roles"
+      ]
+    },
+    "edge_cases": {
+      "description": "Test with valid IDs with and without data, invalid/non-existent IDs, large data sets, empty or missing fields, and boundary values.",
+      "tests": [
+        "Valid IDs that have data",
+        "Valid IDs that have no related data (expect empty array, 200 OK)",
+        "Invalid/non-existent IDs (expect 404 or empty response)",
+        "Large data sets handling (e.g., /photos with 5000 items)",
+        "Pagination or limit parameters if supported",
+        "Response time and payload size handling",
+        "Check for null or missing fields in responses",
+        "Boundary values for numeric IDs (minimum, maximum, zero, negative, non-numeric)"
+      ]
+    },
+    "error_handling": {
+      "description": "Verify API returns appropriate error codes and messages for missing resources, invalid inputs, and unsupported methods.",
+      "tests": [
+        "Non-existent resource IDs return consistent 404 Not Found with meaningful error messages",
+        "Invalid path parameters (e.g., strings instead of numbers) return 400 Bad Request or 404 Not Found",
+        "Unsupported HTTP methods on endpoints return 405 Method Not Allowed"
+      ]
+    },
+    "input_validation": {
+      "description": "Validate types and formats of path and query parameters, and payload validation if applicable.",
+      "tests": [
+        "Path parameter type and format validation (e.g., numeric IDs)",
+        "Query parameter validation including valid and invalid values",
+        "Payload validation for POST/PUT endpoints if they exist: required fields, field types and formats, boundary values, injection attack prevention"
+      ]
+    }
+  },
+  "priorities": {
+    "authentication": "low",
+    "edge_cases": "high",
+    "error_handling": "high",
+    "input_validation": "high"
+  }
+}
+[2026-05-03 15:29:17] [RESULT] Before execution score: 0
+[2026-05-03 15:29:17] [DECISION] Running edge_cases test against /posts/{postId}/comments
+[2026-05-03 15:29:17] [INFO] edge_cases test passed on /posts/{postId}/comments
+[2026-05-03 15:29:17] [DECISION] Running error_handling test against /posts/{postId}/comments
+[2026-05-03 15:29:17] [INFO] error_handling test passed on /posts/{postId}/comments
+[2026-05-03 15:29:17] [DECISION] Running input_validation test against /posts/{postId}/comments
+[2026-05-03 15:29:17] [RESULT] Unexpected response for input_validation on /posts/{postId}/comments
+[2026-05-03 15:29:17] [DECISION] Running edge_cases test against /users/{userId}/posts
+[2026-05-03 15:29:17] [INFO] edge_cases test passed on /users/{userId}/posts
+[2026-05-03 15:29:17] [DECISION] Running error_handling test against /users/{userId}/posts
+[2026-05-03 15:29:17] [INFO] error_handling test passed on /users/{userId}/posts
+[2026-05-03 15:29:17] [DECISION] Running input_validation test against /users/{userId}/posts
+[2026-05-03 15:29:18] [RESULT] Unexpected response for input_validation on /users/{userId}/posts
+[2026-05-03 15:29:18] [DECISION] Running edge_cases test against /albums/{albumId}/photos
+[2026-05-03 15:29:18] [INFO] edge_cases test passed on /albums/{albumId}/photos
+[2026-05-03 15:29:18] [DECISION] Running error_handling test against /albums/{albumId}/photos
+[2026-05-03 15:29:18] [INFO] error_handling test passed on /albums/{albumId}/photos
+[2026-05-03 15:29:18] [DECISION] Running input_validation test against /albums/{albumId}/photos
+[2026-05-03 15:29:18] [RESULT] Unexpected response for input_validation on /albums/{albumId}/photos
+[2026-05-03 15:29:18] [DECISION] Running edge_cases test against /photos
+[2026-05-03 15:29:18] [INFO] edge_cases test passed on /photos
+[2026-05-03 15:29:18] [DECISION] Running error_handling test against /photos
+[2026-05-03 15:29:18] [INFO] error_handling test passed on /photos
+[2026-05-03 15:29:18] [DECISION] Running input_validation test against /photos
+[2026-05-03 15:29:18] [RESULT] Unexpected response for input_validation on /photos
+[2026-05-03 15:29:18] [DECISION] Running edge_cases test against /todos/{todoId}
+[2026-05-03 15:29:19] [INFO] edge_cases test passed on /todos/{todoId}
+[2026-05-03 15:29:19] [DECISION] Running error_handling test against /todos/{todoId}
+[2026-05-03 15:29:19] [INFO] error_handling test passed on /todos/{todoId}
+[2026-05-03 15:29:19] [DECISION] Running input_validation test against /todos/{todoId}
+[2026-05-03 15:29:19] [RESULT] Unexpected response for input_validation on /todos/{todoId}
+[2026-05-03 15:29:19] [DECISION] Running edge_cases test against /users
+[2026-05-03 15:29:19] [INFO] edge_cases test passed on /users
+[2026-05-03 15:29:19] [DECISION] Running error_handling test against /users
+[2026-05-03 15:29:19] [INFO] error_handling test passed on /users
+[2026-05-03 15:29:19] [DECISION] Running input_validation test against /users
+[2026-05-03 15:29:19] [RESULT] Unexpected response for input_validation on /users
+[2026-05-03 15:29:19] [RESULT] After execution score: 74
+[2026-05-03 15:29:19] [RESULT] Issues found: 6
+[2026-05-03 15:29:19] [RESULT] Score improvement: 74
+[2026-05-03 15:31:55] [INFO] Asking OpenAI to suggest likely API endpoints
+[2026-05-03 15:31:58] [DECISION] OpenAI suggested endpoints: /posts, /comments, /albums, /photos, /todos, /users, /posts/{postId}/comments, /users/{userId}/posts, /albums/{albumId}/photos, /todos/{todoId}
+[2026-05-03 15:31:58] [INFO] Starting API exploration
+[2026-05-03 15:31:58] [DECISION] Probing /posts
+[2026-05-03 15:31:58] [RESULT] Discovered /posts with status 200
+[2026-05-03 15:31:58] [DECISION] Probing /comments
+[2026-05-03 15:31:58] [RESULT] Discovered /comments with status 200
+[2026-05-03 15:31:58] [DECISION] Probing /albums
+[2026-05-03 15:31:58] [RESULT] Discovered /albums with status 200
+[2026-05-03 15:31:58] [DECISION] Probing /photos
+[2026-05-03 15:31:58] [RESULT] Discovered /photos with status 200
+[2026-05-03 15:31:58] [DECISION] Probing /todos
+[2026-05-03 15:31:58] [RESULT] Discovered /todos with status 200
+[2026-05-03 15:31:58] [DECISION] Probing /users
+[2026-05-03 15:31:58] [RESULT] Discovered /users with status 200
+[2026-05-03 15:31:58] [DECISION] Probing /posts/{postId}/comments
+[2026-05-03 15:31:58] [RESULT] Discovered /posts/{postId}/comments with status 200
+[2026-05-03 15:31:58] [DECISION] Probing /users/{userId}/posts
+[2026-05-03 15:31:58] [RESULT] Discovered /users/{userId}/posts with status 200
+[2026-05-03 15:31:58] [DECISION] Probing /albums/{albumId}/photos
+[2026-05-03 15:31:58] [RESULT] Discovered /albums/{albumId}/photos with status 200
+[2026-05-03 15:31:58] [DECISION] Probing /todos/{todoId}
+[2026-05-03 15:31:58] [INFO] /todos/{todoId} returned status 404
+[2026-05-03 15:31:58] [RESULT] Exploration found 9 endpoints
+[2026-05-03 15:31:58] [INFO] Sending exploration results to OpenAI for reflection
+[2026-05-03 15:32:10] [EVOLUTION] Based on the exploration results of the JSONPlaceholder API endpoints, here is an analysis and prioritized testing strategy focusing on authentication, edge cases, error handling, and input validation:
+
+---
+
+### 1. **Authentication Testing**
+- **Observation:**  
+  The exploration results show no indication of authentication or authorization requirements (no 401/403 status codes, no auth headers mentioned). JSONPlaceholder is a public test API, so it likely does not enforce auth.
+- **Priority:**  
+  **Low priority** for auth tests here since the API appears open.
+- **Recommendation:**  
+  Confirm by attempting requests with and without typical auth headers (e.g., Authorization). If no auth is required, deprioritize auth tests.
+
+---
+
+### 2. **Edge Case Testing**
+- **Focus Areas:**  
+  - Endpoints with path parameters (`{postId}`, `{userId}`, `{albumId}`, `{todoId}`)  
+  - Large datasets (e.g., `/photos` with 5000 items)  
+  - Empty or zero results (some nested endpoints show zero items)  
+- **Key Edge Cases to Test:**  
+  - Valid IDs at boundaries (e.g., smallest and largest valid IDs)  
+  - Invalid IDs (negative, zero, non-numeric, very large numbers)  
+  - IDs that do not exist (to verify 404 or empty responses)  
+  - Pagination or limits if supported (not shown here, but worth checking)  
+  - Empty collections (e.g., `/posts/{postId}/comments` returns zero items)  
+- **Priority:**  
+  **High priority** because these test the robustness of the API in handling unusual or boundary inputs.
+
+---
+
+### 3. **Error Handling Testing**
+- **Observations:**  
+  - `/todos/{todoId}` returned 404 and was marked undiscovered, indicating some endpoints may not exist or have limited data.  
+  - Other endpoints return 200 even with zero items, which is expected behavior.  
+- **Tests to Prioritize:**  
+  - Confirm 404 responses for non-existent resources (e.g., `/todos/{todoId}` with invalid IDs)  
+  - Check error response structure and content type consistency (should be JSON)  
+  - Test invalid HTTP methods on endpoints (e.g., POST on a GET-only endpoint)  
+  - Test malformed URLs or parameters  
+- **Priority:**  
+  **High priority** to ensure clients can reliably handle errors.
+
+---
+
+### 4. **Input Validation Testing**
+- **Focus:**  
+  - Path parameters (IDs) validation: numeric, range, format  
+  - Query parameters if any (none shown, but worth testing)  
+  - Payload validation for POST/PUT/PATCH if supported (not shown here, but JSONPlaceholder supports POST)  
+- **Tests:**  
+  - Send invalid types (strings instead of numbers) in path params  
+  - Missing required parameters  
+  - Extra unexpected parameters  
+  - Payloads with missing or extra fields  
+- **Priority:**  
+  **Medium to high priority** depending on whether the API supports write operations. For read-only endpoints, focus on path param validation.
+
+---
+
+### Concise Testing Strategy Summary
+
+| Test Category       | Focus Areas & Actions                                                                                     | Priority     |
+|---------------------|----------------------------------------------------------------------------------------------------------|--------------|
+| **Authentication**  | Verify if auth is required by sending requests with/without auth headers.                                | Low          |
+| **Edge Cases**      | Test boundary and invalid IDs, empty collections, large dataset handling, and nested resource queries.   | High         |
+| **Error Handling**  | Validate 404 for missing resources, error response format, invalid HTTP methods, malformed requests.     | High         |
+| **Input Validation**| Validate path parameter types and formats, test missing/extra parameters, and payload validation if applicable. | Medium-High  |
+
+---
+
+### Additional Notes
+- Since this is a public test API, authentication is likely not enforced, so focus efforts on robustness and error handling.
+- The large number of photos (5000) suggests testing performance and pagination (if supported).
+- Nested endpoints returning zero items should be tested for correct empty responses.
+- Confirm consistent content-type and response schema for both success and error cases.
+
+---
+
+**In summary:** Prioritize edge case and error handling tests around path parameters and resource existence. Validate input types and formats rigorously. Confirm authentication requirements but expect none. This approach ensures the API behaves predictably and robustly under varied conditions.
+[2026-05-03 15:32:10] [INFO] Converting reflection into a structured testing strategy
+[2026-05-03 15:32:18] [EVOLUTION] {
+  "endpoints_to_test": [
+    "/posts",
+    "/posts/{postId}",
+    "/posts/{postId}/comments",
+    "/users",
+    "/users/{userId}",
+    "/albums",
+    "/albums/{albumId}",
+    "/todos",
+    "/todos/{todoId}",
+    "/photos"
+  ],
+  "test_types": {
+    "authentication": {
+      "description": "Verify if authentication or authorization is required by sending requests with and without typical auth headers.",
+      "actions": [
+        "Send requests with Authorization headers",
+        "Send requests without Authorization headers",
+        "Confirm no 401/403 status codes"
+      ],
+      "priority": "low"
+    },
+    "edge_case": {
+      "description": "Test boundary and invalid IDs, empty collections, large dataset handling, and nested resource queries.",
+      "actions": [
+        "Test valid IDs at boundaries (smallest and largest valid IDs)",
+        "Test invalid IDs (negative, zero, non-numeric, very large numbers)",
+        "Test IDs that do not exist to verify 404 or empty responses",
+        "Test empty collections (e.g., nested endpoints returning zero items)",
+        "Test large datasets (e.g., /photos with 5000 items)",
+        "Check pagination or limits if supported"
+      ],
+      "priority": "high"
+    },
+    "error_handling": {
+      "description": "Validate 404 for missing resources, error response format, invalid HTTP methods, and malformed requests.",
+      "actions": [
+        "Confirm 404 responses for non-existent resources",
+        "Check error response structure and content-type consistency (should be JSON)",
+        "Test invalid HTTP methods on endpoints (e.g., POST on GET-only endpoints)",
+        "Test malformed URLs or parameters"
+      ],
+      "priority": "high"
+    },
+    "input_validation": {
+      "description": "Validate path parameter types and formats, test missing or extra parameters, and payload validation if applicable.",
+      "actions": [
+        "Send invalid types (strings instead of numbers) in path parameters",
+        "Test missing required parameters",
+        "Test extra unexpected parameters",
+        "Validate payloads with missing or extra fields for POST/PUT/PATCH if supported"
+      ],
+      "priority": "medium-high"
+    }
+  },
+  "priorities": {
+    "authentication": "low",
+    "edge_case": "high",
+    "error_handling": "high",
+    "input_validation": "medium-high"
+  }
+}
+[2026-05-03 15:32:18] [RESULT] Before execution score: 0
+[2026-05-03 15:32:18] [DECISION] Running error_handling test against /posts
+[2026-05-03 15:32:18] [INFO] error_handling test passed on /posts
+[2026-05-03 15:32:18] [DECISION] Running input_validation test against /posts
+[2026-05-03 15:32:19] [RESULT] Unexpected response for input_validation on /posts
+[2026-05-03 15:32:19] [DECISION] Running error_handling test against /posts/{postId}
+[2026-05-03 15:32:20] [INFO] error_handling test passed on /posts/{postId}
+[2026-05-03 15:32:20] [DECISION] Running input_validation test against /posts/{postId}
+[2026-05-03 15:32:20] [RESULT] Unexpected response for input_validation on /posts/{postId}
+[2026-05-03 15:32:20] [DECISION] Running error_handling test against /posts/{postId}/comments
+[2026-05-03 15:32:20] [INFO] error_handling test passed on /posts/{postId}/comments
+[2026-05-03 15:32:20] [DECISION] Running input_validation test against /posts/{postId}/comments
+[2026-05-03 15:32:20] [RESULT] Unexpected response for input_validation on /posts/{postId}/comments
+[2026-05-03 15:32:20] [DECISION] Running error_handling test against /users
+[2026-05-03 15:32:20] [INFO] error_handling test passed on /users
+[2026-05-03 15:32:20] [DECISION] Running input_validation test against /users
+[2026-05-03 15:32:20] [RESULT] Unexpected response for input_validation on /users
+[2026-05-03 15:32:20] [DECISION] Running error_handling test against /users/{userId}
+[2026-05-03 15:32:21] [INFO] error_handling test passed on /users/{userId}
+[2026-05-03 15:32:21] [DECISION] Running input_validation test against /users/{userId}
+[2026-05-03 15:32:21] [RESULT] Unexpected response for input_validation on /users/{userId}
+[2026-05-03 15:32:21] [DECISION] Running error_handling test against /albums
+[2026-05-03 15:32:21] [INFO] error_handling test passed on /albums
+[2026-05-03 15:32:21] [DECISION] Running input_validation test against /albums
+[2026-05-03 15:32:21] [RESULT] Unexpected response for input_validation on /albums
+[2026-05-03 15:32:21] [DECISION] Running error_handling test against /albums/{albumId}
+[2026-05-03 15:32:21] [INFO] error_handling test passed on /albums/{albumId}
+[2026-05-03 15:32:21] [DECISION] Running input_validation test against /albums/{albumId}
+[2026-05-03 15:32:22] [RESULT] Unexpected response for input_validation on /albums/{albumId}
+[2026-05-03 15:32:22] [DECISION] Running error_handling test against /todos
+[2026-05-03 15:32:22] [INFO] error_handling test passed on /todos
+[2026-05-03 15:32:22] [DECISION] Running input_validation test against /todos
+[2026-05-03 15:32:22] [RESULT] Unexpected response for input_validation on /todos
+[2026-05-03 15:32:22] [DECISION] Running error_handling test against /todos/{todoId}
+[2026-05-03 15:32:22] [INFO] error_handling test passed on /todos/{todoId}
+[2026-05-03 15:32:22] [DECISION] Running input_validation test against /todos/{todoId}
+[2026-05-03 15:32:22] [RESULT] Unexpected response for input_validation on /todos/{todoId}
+[2026-05-03 15:32:22] [DECISION] Running error_handling test against /photos
+[2026-05-03 15:32:22] [INFO] error_handling test passed on /photos
+[2026-05-03 15:32:22] [DECISION] Running input_validation test against /photos
+[2026-05-03 15:32:22] [RESULT] Unexpected response for input_validation on /photos
+[2026-05-03 15:32:22] [RESULT] After execution score: 80
+[2026-05-03 15:32:22] [RESULT] Issues found: 10
+[2026-05-03 15:32:22] [RESULT] Score improvement: 80
